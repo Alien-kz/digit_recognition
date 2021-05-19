@@ -67,24 +67,64 @@ def print_segments(segments, single_duration, units_name):
     print(f"Total duration: {total_duration:.3f} {units_name}")
 
 
-def mask_compress(data):
+def compress_mask(mask):
     segments = [];
-    if len(data) == 0:
+    if len(mask) == 0:
         return segments
     start = -1
     stop = -1
-    if data[0] == 1:
+    if mask[0] == 1:
         start = 0
-    for i in range(len(data) - 1):
-        if data[i] == 0 and data[i + 1] == 1:
+    for i in range(len(mask) - 1):
+        if mask[i] == 0 and mask[i + 1] == 1:
             start = i + 1;
-        if data[i] == 1 and data[i + 1] == 0:
+        if mask[i] == 1 and mask[i + 1] == 0:
             stop = i + 1;
             segments.append(Segment(start, stop));
-    if data[-1] == 1:
-        stop = len(data)
+    if mask[-1] == 1:
+        stop = len(mask)
         segments.append(Segment(start, stop));
     return segments
+
+def get_vad_segments(audio, sample_rate, segment_hop_sec, vad_threshold):
+    segment_hop_samples = sec2samples(segment_hop_sec, sample_rate)
+    segments_energy = get_segments_energy(audio, segment_hop_samples)
+    vad_mask = get_vad_mask(segments_energy, vad_threshold)
+    segments = compress_mask(vad_mask)
+    print_with_timeline(segments_energy, segment_hop_sec , "sec", 10)
+    print_with_timeline(vad_mask, segment_hop_sec , "sec", 10)
+    print_segments(segments, segment_hop_sec, "sec")
+    return segments
+
+def get_digits(wav_file_path):
+    fname_wav = wav_file_path.split('/')[-1]
+    fname = fname_wav.split('.')[0]
+    digits = fname.split("_")
+    print(digits)
+    return fname, digits
+
+def get_max_duration(segments, sample_rate, segment_hop_sec):
+    segment_hop_samples = sec2samples(segment_hop_sec, sample_rate)
+    segment_hop_samples = sec2samples(segment_hop_sec, sample_rate)
+    max_duration_sec = 0
+    for segment in segments:
+        duration_sec = (segment.stop - segment.start) * segment_hop_samples / sample_rate
+        if duration_sec > max_duration_sec:
+            max_duration_sec = duration_sec
+    print(max_duration_sec)
+    return max_duration_sec
+
+def split_and_save(digits, segments, fname, audio, segment_hop_sec, output_wav_directory):
+    segment_hop_samples = sec2samples(segment_hop_sec, sample_rate)
+    position = 0
+    for digit, segment in zip(digits, segments):
+        new_wav_file_path = f"{output_wav_directory}/{digit}/{fname}#{position}.wav"
+
+        start_samples = segment.start * segment_hop_samples
+        stop_samples = segment.stop * segment_hop_samples
+        print(new_wav_file_path, start_samples, stop_samples)
+        write(new_wav_file_path, sample_rate, audio[start_samples:stop_samples])
+        position += 1
 
 if __name__ == "__main__":
     argc = len(sys.argv)
@@ -94,40 +134,18 @@ if __name__ == "__main__":
         exit(1)
 
     wav_file_path = sys.argv[1]
-    segment_duration = float(sys.argv[2])
+    segment_hop_sec = float(sys.argv[2])
     vad_threshold = float(sys.argv[3])
     output_wav_directory = sys.argv[4]
+
     sample_rate, audio = read(wav_file_path)
 
-    segment_duration_samples = sec2samples(segment_duration, sample_rate)
-    segments_energy = get_segments_energy(audio, segment_duration_samples)
-    vad_mask = get_vad_mask(segments_energy, vad_threshold)
-    segments = mask_compress(vad_mask)
+    segments = get_vad_segments(audio, sample_rate, segment_hop_sec, vad_threshold)
 
-    print_with_timeline(segments_energy, segment_duration, "sec", 10)
-    print_with_timeline(vad_mask, segment_duration, "sec", 10)
-    print_segments(segments, segment_duration, "sec")
-
-    fname = wav_file_path[-11:-4]
-    digits = fname.split("_")
-    print(digits)
+    fname, digits = get_digits(wav_file_path)
     assert len(digits) == len(segments), "Bad threshold"
 
-    max_duration = 0
-    for segment in segments:
-        duration = (segment.stop - segment.start) * segment_duration_samples / sample_rate
-        if duration > max_duration:
-            max_duration = duration
-    print(max_duration)
-    assert max_duration <= 0.6, f"max_duration={max_duration:.3f}"
+    max_duration_sec = get_max_duration(segments, sample_rate, segment_hop_sec)
+    assert max_duration_sec <= 0.6, f"max_duration_sec={max_duration_sec:.3f}"
 
-    position = 0
-    for digit, segment in zip(digits, segments):
-        new_wav_file_path = f"{output_wav_directory}/{digit}/{fname}#{position}.wav"
-
-        start = segment.start * segment_duration_samples
-        stop = segment.stop * segment_duration_samples
-        print(new_wav_file_path, start, stop)
-        write(new_wav_file_path, sample_rate, audio[start:stop])
-
-        position += 1
+    split_and_save(digits, segments, fname, audio, segment_hop_sec, output_wav_directory)
