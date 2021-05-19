@@ -14,9 +14,10 @@ def print_with_timeline(data, single_duration, units_name, row_limit):
 
 def get_segment_energy(data, start, end):
     energy = 0
+    data = data / 32768
     for i in range(start, end):
-        energy += float(data[i]) * data[i] / (end - start)
-    energy = np.sqrt(energy) / 32768
+        energy += data[i] * data[i] / (end - start)
+    energy = np.sqrt(energy)
     return energy
 
 
