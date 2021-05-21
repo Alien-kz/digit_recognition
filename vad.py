@@ -127,18 +127,8 @@ def split_and_save(digits, segments, fname, audio, segment_hop_sec, output_wav_d
         write(new_wav_file_path, sample_rate, audio[start_samples:stop_samples])
         position += 1
 
-if __name__ == "__main__":
-    argc = len(sys.argv)
-    if argc != 5:
-        print("Incorrect args. Example:")
-        print("python3 split_by_vad.py dataset/wav/1_2_3_4_5.wav 0.1 0.01 dataset/splitted/")
-        exit(1)
 
-    wav_file_path = sys.argv[1]
-    segment_hop_sec = float(sys.argv[2])
-    vad_threshold = float(sys.argv[3])
-    output_wav_directory = sys.argv[4]
-
+def process_file(wav_file_path, segment_hop_sec, vad_threshold, output_wav_directory):
     sample_rate, audio = read(wav_file_path)
 
     segments = get_vad_segments(audio, sample_rate, segment_hop_sec, vad_threshold)
@@ -150,3 +140,26 @@ if __name__ == "__main__":
     assert max_duration_sec <= 0.6, f"max_duration_sec={max_duration_sec:.3f}"
 
     split_and_save(digits, segments, fname, audio, segment_hop_sec, output_wav_directory)
+
+if __name__ == "__main__":
+    argc = len(sys.argv)
+    if argc != 5:
+        print("Incorrect args. Example:")
+        print("python3 vad.py dataset/wav/1_2_3_4_5.wav 0.1 0.01 dataset/splitted/")
+        exit(1)
+
+    wav_file_path = sys.argv[1]
+    segment_hop_sec = float(sys.argv[2])
+    vad_threshold = float(sys.argv[3])
+    output_wav_directory = sys.argv[4]
+
+    log = []
+    for file_name in os.path(wav_file_path):
+        try:
+            process_file()
+            log.append(file_name + "\tOK\n")
+        except Exception:
+            log.append(file_name + "\tFAILED\n"))
+    with open(log_file, "w") as f:
+        log_text = ''.join(log)
+        f.write(log_text)
