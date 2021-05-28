@@ -159,7 +159,7 @@ if __name__ == "__main__":
             process_file()
             log.append(file_name + "\tOK\n")
         except Exception:
-            log.append(file_name + "\tFAILED\n"))
+            log.append(file_name + "\tFAILED\n")
     with open(log_file, "w") as f:
         log_text = ''.join(log)
         f.write(log_text)
